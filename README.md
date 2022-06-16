@@ -10,3 +10,4 @@
 
 - The program should parse EXCEL file and generate HWP files automatically.
 - HWP to JPG/BMP/PNG image function is needed
+- Consignee and buyer have to differ but they don't, this has to be fixed.
