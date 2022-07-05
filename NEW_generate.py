@@ -5,15 +5,18 @@ import random
 from datetime import datetime
 from random import randrange
 from datetime import timedelta
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-f','--file-path', type=str, default="VARIAB_2.xlsx", help='load file path or file name')
+opt = parser.parse_args()
 
-
-wb = openpyxl.load_workbook('VariableDataFillingSpec.xlsx')
+wb = openpyxl.load_workbook(opt.file_path)
 sheet_name_list = wb.sheetnames
-test = '테스트'
 
-data_field = pd.read_excel(io='VariableDataFillingSpec.xlsx', sheet_name='VDPSpec')
-data_format = pd.read_excel(io='VariableDataFillingSpec.xlsx', sheet_name='VDPSpec (2)')
+
+data_field = pd.read_excel(io=opt.file_path, sheet_name='VDPSpec')
+data_format = pd.read_excel(io=opt.file_path, sheet_name='VDataSpec')
 
 data_field_dict = {}
 data_format_dict = {}
@@ -60,7 +63,7 @@ def number_change(num_data):
 
 def check_Data(value):
     str_data = ''
-    indices = pd.read_excel('VariableDataFillingSpec.xlsx',sheet_name=value,header=None)
+    indices = pd.read_excel(opt.file_path,sheet_name=value,header=None)
     if indices.values.flatten().tolist():
         str_data = random.choice(indices.values.flatten().tolist())
     return str_data
