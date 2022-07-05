@@ -10,7 +10,7 @@ from datetime import timedelta
 
 wb = openpyxl.load_workbook('VariableDataFillingSpec.xlsx')
 sheet_name_list = wb.sheetnames
-
+test = '테스트'
 
 data_field = pd.read_excel(io='VariableDataFillingSpec.xlsx', sheet_name='VDPSpec')
 data_format = pd.read_excel(io='VariableDataFillingSpec.xlsx', sheet_name='VDPSpec (2)')
