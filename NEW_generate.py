@@ -6,6 +6,8 @@ from datetime import datetime
 from random import randrange
 from datetime import timedelta
 import argparse
+import os
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-f','--file-path', type=str, default="VARIAB_2.xlsx", help='load file path or file name')
@@ -18,27 +20,6 @@ sheet_name_list = wb.sheetnames
 data_field = pd.read_excel(io=opt.file_path, sheet_name='VDPSpec')
 data_format = pd.read_excel(io=opt.file_path, sheet_name='VDataSpec')
 
-data_field_dict = {}
-data_format_dict = {}
-total_dict = {}
-item_dict = {}
-#필드 및 포멧형식 만들기
-for i in range(len(data_field)):
-    data_field_dict[data_field.iloc[i][0]] = data_field.iloc[i][1]
-for j in range(len(data_format)):
-    data_format_dict[data_format.iloc[j][0]] = data_format.iloc[j][1]
-#필드 및 포멧형식 재구성
-for key,val in data_field_dict.items():
-    if len(val.split('+')) == 1:
-        if val in data_format_dict.keys():
-            total_dict[key] = data_format_dict[val]
-    #여러개를 합친거 처리 필요
-    else:
-        item_lst = []
-        for lst in val.split('+'):
-            if lst in data_format_dict.keys():
-                 item_lst.append(data_format_dict[lst])
-        total_dict[key] = item_lst
     #         # print(len(val.split('+')))
     #         break
 
@@ -72,30 +53,65 @@ def edit_content(data, src, target):
 
     return data.replace(str(src).encode(), str(target).encode(), 1)
 
-for key, value in total_dict.items():
-    if isinstance(value,list):
-        sum_data = ''
-        for idx,item in enumerate(value):
-            if item in sheet_name_list:
-                str_data = check_Data(item)
-                sum_data = sum_data + str_data
-            if '#' in item :
-                num_data = number_change(item)
-                sum_data = sum_data + num_data
-        total_dict[key] = sum_data
-    if 'MM/DD/YYYY' in value:
-        total_dict[key] = random_date(d1, d2).strftime("%m/%d/%Y")
-    if value in sheet_name_list:
-        str_data = check_Data(value)
-        total_dict[key] = str_data
-    if '#' in total_dict[key]:
-        num_data = number_change(total_dict[key])
-        total_dict[key] = num_data
 
-with open('Form_NV_0001.hml', 'rb') as f:
-    data = f.read()
-for key, value in total_dict.items():
-    data = edit_content(data, key, value.replace('&', '&amp;'))
+howmany = input('몇개를 만드실래요')
+for i in range(int(howmany)):
 
-with open(f'sample{str(1).zfill(4)}.hml', 'wb') as f:
-    f.write(data)
+    data_field_dict = {}
+    data_format_dict = {}
+    total_dict = {}
+    item_dict = {}
+    # 필드 및 포멧형식 만들기
+    for i in range(len(data_field)):
+        data_field_dict[data_field.iloc[i][0]] = data_field.iloc[i][1]
+    for j in range(len(data_format)):
+        data_format_dict[data_format.iloc[j][0]] = data_format.iloc[j][1]
+    # 필드 및 포멧형식 재구성
+    for key, val in data_field_dict.items():
+        if len(val.split('+')) == 1:
+            if val in data_format_dict.keys():
+                total_dict[key] = data_format_dict[val]
+        # 여러개를 합친거 처리 필요
+        else:
+            item_lst = []
+            for lst in val.split('+'):
+                if lst in data_format_dict.keys():
+                    item_lst.append(data_format_dict[lst])
+            total_dict[key] = item_lst
+    for key, value in total_dict.items():
+        if isinstance(value,list):
+            sum_data = ''
+            for idx,item in enumerate(value):
+                if item in sheet_name_list:
+                    str_data = check_Data(item)
+                    sum_data = sum_data + str_data
+                if '#' in item :
+                    num_data = number_change(item)
+                    sum_data = sum_data + num_data
+            total_dict[key] = sum_data
+        if 'MM/DD/YYYY' in value:
+            total_dict[key] = random_date(d1, d2).strftime("%m/%d/%Y")
+        if value in sheet_name_list:
+            str_data = check_Data(value)
+            total_dict[key] = str_data
+        if '#' in total_dict[key]:
+            num_data = number_change(total_dict[key])
+            total_dict[key] = num_data
+
+    with open('Form_NV_0001.hml', 'rb') as f:
+        data = f.read()
+    for key, value in total_dict.items():
+        data = edit_content(data, key, value.replace('&', '&amp;'))
+
+
+    path = 'result#.hml'
+
+    i = 0
+    while True:
+
+        replaced_path = path.replace("#", str(i).zfill(4))
+        if not os.path.exists(replaced_path):
+            break
+        i +=1
+    with open(replaced_path, 'wb') as f:
+        f.write(data)
