@@ -1,168 +1,159 @@
 import pandas as pd
+import openpyxl
+import pickle
+import random
+from datetime import datetime
 from random import randrange
 from datetime import timedelta
+import argparse
+import os
+from bs4 import BeautifulSoup
+from tqdm import tqdm
 
-def random_date(start, end):
-    delta = end - start
-    int_delta = (delta.days )
-    random_second = randrange(int_delta)
+class GenHwp:
+    def __init__(self, file_path):
+        print("\r 변환 준비중 ...")
+        # wb = openpyxl.load_workbook(file_path)
+        # self.sheet_name_list = wb.sheetnames
+        self.d1 = datetime.strptime('1/1/2000', '%m/%d/%Y')
+        self.d2 = datetime.strptime('7/15/2022', '%m/%d/%Y')
+        self.total_dict, self.excel_dict = self.load_db(file_path)
+        print("\r 준비완료 ... 변환 시작 ..")
 
-    return start + timedelta(days=random_second)
+    def load_db(self, file_path):
+        wb = openpyxl.load_workbook(file_path)
+        sheet_name_list = wb.sheetnames
+        self.sheet_name_list = sheet_name_list
+        with open('sheet_name_list.pickle', 'wb') as f:
+            f.write(pickle.dumps(sheet_name_list))
+        excel_dict = pd.read_excel(file_path,sheet_name=wb.sheetnames, header=None,engine='openpyxl')
 
-from datetime import datetime
-d1 = datetime.strptime('1/1/2000', '%m/%d/%Y')
-d2 = datetime.strptime('6/9/2022', '%m/%d/%Y')
+        for key, item in excel_dict.items():
+            if key == 'VDPSpec' or key == 'VDataSpec':
+                continue
+            excel_dict[key] = excel_dict[key].dropna()
+        data_field_dict = {}
+        data_format_dict = {}
+        total_dict = {}
+        data_field = excel_dict['VDPSpec']
+        data_format = excel_dict['VDataSpec']
+        # 필드 및 포멧형식 만들기
+        for i in range(len(data_field)):
+            data_field_dict[data_field.iloc[i][0]] = data_field.iloc[i][1]
+        for j in range(len(data_format)):
+            data_format_dict[data_format.iloc[j][0]] = data_format.iloc[j][1]
+        # 필드 및 포멧형식 재구성
+        for key, val in data_field_dict.items():
+            key = key.upper()
+            if len(val.split('+')) == 1:
+                if val in data_format_dict.keys():
+                    total_dict[key] = data_format_dict[val]
+            # 여러개를 합친거 처리 필요
+            else:
+                item_lst = []
+                for lst in val.split('+'):
+                    if lst in data_format_dict.keys():
+                        item_lst.append(data_format_dict[lst])
+                total_dict[key] = item_lst
+        return total_dict, excel_dict
 
-def remove_zeros(data):
-    return str(int(data))
+    def random_date(self, start, end):
+        delta = end - start
+        int_delta = (delta.days)
+        random_second = randrange(int_delta)
+        return start + timedelta(days=random_second)
+    def number_change(self, num_data):
+        while '@AA' in num_data:
+            targte_value = random.randint(1, 9)
+            num_data = num_data.replace('@AA', str(targte_value), 1)
 
+        while '#AA' in num_data:
+            targte_value = random.randint(0, 9)
+            num_data = num_data.replace('#AA', str(targte_value), 1)
+        return num_data
 
-import random
-class Fields(object):
-    def __init__(self, data_list, ):
-        company, address, port, kind, country = data_list
+    def change_data(self, value):
+        str_data = ''
+        indices = self.excel_dict[value]
+        if indices.values.flatten().tolist():
+            str_data = random.choice(indices.values.flatten().tolist())
+        return str_data
+    def edit_content(self, data, src, target):
+        return data.replace(str(src).encode(), str(target).encode(), 1)
 
-        self.Invoice = '#####'
-        self.InvoiceDate = random_date(d1, d2).strftime("%m/%d/%Y")
-        self.phone_number = '(##)###-####'
-        self.Cosignee = company + ' ' + address + ' ' + self.phone_number
-        self.Buyer = self.Cosignee
-        self.Port = port
-        self.OrderNumber = '#######'
-        self.CustomerPONumber = self.OrderNumber
-        self.TermsOfDelivery = '## Days'
-        self.MarksAndNumbers = 'DLSU#######'
-        self.Pkgs = '##'
-        self.TotalGrossWeight = '###'
-        self.TotalCube = '##.##'
-        self.PackageSpec = kind +' '+ self.TotalGrossWeight +' '+ self.TotalCube
-        self.PartNumber = '##'
-        self.HTS ='####.##.####'
-        self.Quantity = '###'
-        self.PriceEach = '$#,###.##'
-        self.Value = '$#,###.##'
-        self.InvoiceTotal = '$#,###.##'
-        self.CountryOfOrigin = country
-    def get_str(self):
-        dict_data = self.__dict__
-        remov_zeros_list = ['PartNumber', 'Quantity']
-        for key, value in dict_data.items():
-            while '#' in dict_data[key]:
-                targte_value = random.randint(0, 9)
-                dict_data[key] = dict_data[key].replace('#', str(targte_value), 1)
+    def change_str(self,key, value):
+        with open('sheet_name_list.pickle', 'rb') as f:
+            sheet_name_list = pickle.loads(f.read())
 
-        for key in remov_zeros_list:
-            dict_data[key] = remove_zeros(dict_data[key])
-        return dict_data
-    def get_value(self):
-        return 'test'
-import xmltodict
-#
-# def hwp_to_image(hwp_path):
-#     filename = hwp_path
-#     hwp = win32.gencache.EnsureDispatch("HWPFrame.HwpObject")
-#     hwp.RegisterModule("FilePathCheckDLL", "SecurityModule")
-#     with open('Form_NV0_0525A_0001.hml', 'rb') as f:
-#         data = f.read() #.find(b'#Number, kind, weight and dimensions of packages')#.replace(b'#Cosignee', b'test')
-#     hwp.Open(hwp_path)
-#
-#     xml = hwp.GetTextFile("HWP", "")
-#     print(xml)
-#     exit()
-#
-#     with open(hwp_path.replace('hwp', 'xml'), 'w', encoding="UTF-8") as f:
-#         f.write(xml)
-#     with open(hwp_path.replace('hwp', 'xml'), 'r', encoding="UTF-8") as f:
-#         data = f.read()
-#     import json
-#     jsonString = json.dumps(xmltodict.parse(data, process_namespaces=True),
-#                             ensure_ascii=False,
-#                             indent=4
-#                             )
-#     with open(hwp_path.replace("hwp", 'json'), 'w', encoding="UTF-8") as f:
-#         f.write(jsonString)
-#
-#     xmlString = xmltodict.unparse(json.loads(jsonString)
-#                                   # , pretty=True
-#                                   , encoding='utf-16'  # 16 중요 안하면 한글에서 인식 못함
-#                                   )
-#
-#     with open(hwp_path.replace('asdf.hwp', 'asdf_json.xml') , 'w', encoding="UTF-8") as f:
-#         f.write(xmlString)
-#     with open(hwp_path.replace('asdf.hwp', 'asdf_json.xml') , 'r', encoding="UTF-8") as f:
-#         tt = f.read()
-#     hwp = win32.gencache.EnsureDispatch("HWPFrame.HwpObject")
-#     hwp.RegisterModule("FilePathCheckDLL", "SecurityModule")
-#     hwp.SetTextFile(tt, "HWPML2X", "")
-#     hwp.SaveAs(hwp_path.replace('asdf', "rrrr"), "HWPML2X", "")
-    # with open(filename.replace('hwp', 'xml'), 'w') as f:
-    #     f.write(xml)
+        new_value = ""
+        if isinstance(value, list):
+            sum_data = ''
+            for idx, item in enumerate(value):
+                if item in sheet_name_list:
+                    str_data = self.change_data(item)
+                    sum_data = sum_data + str_data
+                    num_data = self.number_change(item)
+                    sum_data = sum_data + num_data
+            new_value = sum_data
+            return new_value
 
+        if 'MM/DD/YYYY' in value:
+            new_value = self.random_date(self.d1, self.d2).strftime("%m/%d/%Y")
+        if value in sheet_name_list:
+            if value == 'date1':
+                return self.random_date(self.d1, self.d2).strftime(self.change_data(value))
+            else:
+                if value.lower() == 'telno1':
+                    pass
+                str_data = self.change_data(value)
+                new_value = self.number_change(str_data)
+                if 'fax' in value:
+                    new_value = self.total_dict[[item for item in self.total_dict.keys() if 'tel' in item][0]][
+                                :-1] + str(
+                        random.randint(0, 9))
+                return new_value
+        num_data = self.number_change(self.total_dict[key])
+        new_value = num_data
 
-    # hwp.CreatePageImage("{}".format(filename.replace(".hwp", "")), 0, resolution=300,depth=24)
+        try:
+            return new_value.upper()
+        except Exception as e:
+            print(e)
+            return new_value
 
+    def generate(self, in_f_path, result_path):
+        with open(in_f_path, 'rb') as f:
+            data = f.read()
+        soup = BeautifulSoup(data, 'html.parser')
+        total = len(soup.select("RECTANGLE"))
+        for idx, item in tqdm(enumerate(soup.select("RECTANGLE"))):
+            if item.char is None:
+                continue
+            char = item.char.text
+            if not '#' in char:
+                continue
+            data = self.edit_content(data, char,
+                                self.change_str(char.strip().upper(), self.total_dict[char.strip().upper()]).replace('&',
+                                                                                                           '&amp;'))
+        path = result_path
 
+        i = 0
+        while True:
 
-# hwp_to_image(os.path.abspath('dataset/asdf.hwp'))
+            replaced_path = path.replace("#", str(i).zfill(4))
+            if not os.path.exists(replaced_path):
+                break
+            i += 1
+        with open(replaced_path, 'wb') as f:
+            f.write(data)
 
-def edit_content(data, src, target):
+parser = argparse.ArgumentParser()
+parser.add_argument('-ep','--excel-path', type=str, default="VARIAB_2.xlsx", help='입력 엑셀 경로')
+parser.add_argument('-hp','--hml-path', type=str, default="Form_NV_0004.hml", help='입력 hml 경로')
+parser.add_argument('-op','--output-path', type=str, default="result#.hml", help='#이 숫자로 바뀐 result 결과값')
+opt = parser.parse_args()
+howmany = input('몇개를 만드실래요')
+gen_hwp = GenHwp(opt.excel_path)
 
-    return data.replace(str(src).encode(), str(target).encode(), 1)
-
-key_value_pair = [('#Invoice Total(USD)', 'InvoiceTotal'),
-                  ('#Invoice Date', 'InvoiceDate'),('#Invoice', 'Invoice') , ('#Cosignee', 'Cosignee'), ('#Origin of Shipment', 'Port'),
-                  ('#Buyer', 'Buyer'),
-                  ('#Sales Order No.', 'OrderNumber'), ('#Customer PO No.', 'CustomerPONumber'), ('#Terms of Sale and Delivery', 'TermsOfDelivery'),
-                  ('#Marks and Numbers', 'MarksAndNumbers'), ('#Number, kind, weight and dimensions of packages', 'PackageSpec'),
-                  ('# # of Pkgs', 'Pkgs'), ('#Total Gross Weight', 'TotalGrossWeight'), ('#Total Cube', 'TotalCube'), ('#Part number', 'PartNumber'),
-                  ('#Countryof Origin', 'CountryOfOrigin'), ('#HTS', 'HTS'), ('#Quantity', 'Quantity'), ('#Price each', 'PriceEach'), ("#Value(USD)", "Value")]
-
-indices = pd.read_excel('OCRDBFields_.xlsx',sheet_name='3rd')
-with open('Form_NV0_0525A_0001-40.hml', 'rb') as f:
-    data = f.read()  # .find(b'#Number, kind, weight and dimensions of packages')#.replace(b'#Cosignee', b'test')
-for idx1, item in indices.iterrows():
-    if idx1 <800:
-        continue
-    if idx1>1001:
-        break
-
-    item = list(item[indices.columns].values)
-#     # 'company', 'address', 'kind', 'country', 'tech'
-#     print(item)
-    fields = Fields(item)
-
-    target_dict = fields.get_str()
-    # print(data.decode())
-#
-    for idx, item in enumerate(key_value_pair):
-        data = edit_content(data, item[0], target_dict[item[1]].replace('&', '&amp;'))
-    data = edit_content(data, '#Technical Description', "")
-with open(f'sample{str(905).zfill(4)}.hml', 'wb') as f:
-    f.write(data)
-    # hwp_to_image(f'test{21+idx1}.hml')
-#
-# # with open('test1.hml', 'wb') as f:
-# #     f.write(data)
-# import xml.etree.ElementTree as ET
-#
-#
-#
-# with open("Form_NV0_0525A_0001.hml",'r', encoding="UTF-8") as f:
-#     xml2 = f.read()
-# import json
-# tree = ET.parse("Form_NV0_0525A_0001.hml")
-# root = tree.getroot()
-# print(root)
-# asdf = tree.iter("IMAGE")
-# import base64
-# imgdata = base64.b64decode(tree.getiterator('IMAGE')[0].text.encode('utf-16'))
-# filename = 'some_image.png'  # I assume you have a way of picking unique filenames
-# with open(filename, 'wb') as f:
-#     f.write(imgdata)
-
-# hwp = win32.gencache.EnsureDispatch("HWPFrame.HwpObject")
-# hwp.RegisterModule("FilePathCheckDLL", "SecurityModule")
-# hwp.SetTextFile(xml2, "HWPML2X", "")
-# hwp.SaveAs(r"C:\Users\sunci\Desktop\busi\hhh.hwp","HWPML2X","")
-
-# hwp.Quit()
+for i in tqdm(range(int(howmany))):
+    gen_hwp.generate(opt.hml_path, opt.output_path)
